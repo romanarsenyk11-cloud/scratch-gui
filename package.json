@@ -10,21 +10,50 @@
     "url": "https://github.com/LLK/scratch-gui.git"
   },
   "main": "./dist/scratch-gui.js",
+  "packageManager": "pnpm@10.28.2",
   "scripts": {
-    "build": "npm run clean && webpack --colors --bail",
-    "clean": "rimraf ./build && mkdirp build && rimraf ./dist && mkdirp dist",
-    "deploy": "touch build/.nojekyll && gh-pages -t -d build -m \"[skip ci] Build for $(git log --pretty=format:%H -n1)\"",
+    "build": "node scripts/build.mjs --site-only",
+    "build:all": "node scripts/build.mjs",
+    "build:editor": "MW_COMMUNITY= ONLY_ENTRY=editor node scripts/build.mjs",
+    "build:community": "MW_COMMUNITY=true ONLY_ENTRY=community node scripts/build.mjs",
+    "build:stats": "MW_BUILD_STATS=true node scripts/build.mjs --site-only",
+    "clean": "node -e \"for (const d of ['build', 'dist']) { fs.rmSync(d, {recursive: true, force: true}); fs.mkdirSync(d, {recursive: true}); }\"",
+    "setup": "pnpm install",
+    "reinstall": "pnpm install --force && pnpm run link",
+    "deploy": "BUILD_DIR=deploy-build node scripts/build.mjs --site-only && touch deploy-build/.nojekyll && cp -r functions deploy-build/functions && node scripts/validate-deploy.mjs deploy-build && gh-pages -t -d deploy-build -m \"Build for $(git log --pretty=format:%H -n1)\"",
+    "clean:deploy": "node -e \"fs.rmSync('deploy-build', {recursive: true, force: true}); fs.mkdirSync('deploy-build', {recursive: true});\"",
     "prepublish": "node scripts/prepublish.mjs",
     "prune": "./prune-gh-pages.sh",
     "i18n:push": "tx-push-src scratch-editor interface translations/en.json",
-    "i18n:src": "rimraf ./translations/messages/src && babel src > tmp.js && rimraf tmp.js && build-i18n-src ./translations/messages/src ./translations/",
-    "start": "webpack-dev-server",
-    "test": "npm run test:lint && npm run test:unit && npm run build && npm run test:integration",
-    "test:integration": "jest --maxWorkers=4 test[\\\\/]integration",
+    "i18n:src": "node -e \"fs.rmSync('translations/messages/src', {recursive: true, force: true})\" && babel src > tmp.js && node -e \"fs.rmSync('tmp.js', {force: true})\" && build-i18n-src ./translations/messages/src ./translations/",
+    "start": "vite",
+    "fmt": "eslint --fix .",
+    "lint": "eslint .",
+    "test": "pnpm run test:unit:ci && pnpm run build && pnpm run test:integration",
+    "test:integration": "node scripts/test-integration.mjs",
     "test:lint": "eslint . --ext .js,.jsx",
-    "test:unit": "jest test[\\\\/]unit[\\\\/]addons",
+    "check:community-css": "node scripts/check-community-css.mjs",
+    "deps:sync": "node scripts/sync-forks.mjs",
+    "deps:check": "node scripts/sync-forks.mjs --check",
+    "test:collab": "jest test[\\\\/]unit[\\\\/]collaboration",
+    "test:unit": "jest test[\\\\/]unit",
+    "test:unit:ci": "jest --runInBand test[\\\\/]unit",
+    "test:unit:addons": "jest test[\\\\/]unit[\\\\/]addons",
+    "test:unit:watch": "jest test[\\\\/]unit --watch",
     "test:smoke": "jest --runInBand test[\\\\/]smoke",
-    "watch": "webpack --colors --watch"
+    "watch": "vite build --watch",
+    "link": "node scripts/link-forks.mjs",
+    "unlink": "node scripts/link-forks.mjs --unlink",
+    "build:library": "BUILD_MODE=dist vite build",
+    "preview": "vite preview",
+    "build:report": "node scripts/build-report.mjs",
+    "i18n:community": "node scripts/community-translations.mjs",
+    "i18n:community:add": "node scripts/community-translations.mjs add",
+    "i18n:community:coverage": "node scripts/community-translations.mjs coverage",
+    "i18n:community:extract": "node scripts/community-extract.mjs",
+    "i18n:community:check": "node scripts/community-extract.mjs --check && node scripts/community-translations.mjs check",
+    "i18n:editor:extract": "node scripts/editor-default-messages.mjs",
+    "i18n:editor:check": "node scripts/editor-default-messages.mjs --check"
   },
   "config": {
     "commitizen": {
@@ -32,114 +61,105 @@
     }
   },
   "dependencies": {
+    "@fiahfy/icns": "0.0.7",
+    "@isomorphic-git/lightning-fs": "^4.6.2",
     "@microbit/microbit-universal-hex": "0.2.2",
+    "@turbowarp/json": "^0.1.2",
+    "@turbowarp/jszip": "^3.11.1",
     "@turbowarp/nanolog": "^0.2.0",
+    "@turbowarp/sbdl": "^4.0.1",
     "@turbowarp/scratch-l10n": "^3.1001.0-202401241456-994097a5",
     "@turbowarp/scratch-storage": "^0.0.202403251715",
     "@turbowarp/scratch-svg-renderer": "^1.0.0-202312242305-12c360b",
     "@turbowarp/startaudiocontext": "^1.0.0",
-    "arraybuffer-loader": "^1.0.6",
-    "autoprefixer": "^9.0.1",
     "balance-text": "3.3.1",
-    "base64-loader": "1.0.0",
-    "bowser": "1.9.4",
+    "bowser": "^2.12.1",
     "classnames": "2.2.6",
     "computed-style-to-inline-style": "3.0.0",
-    "cookie": "0.5.0",
-    "copy-webpack-plugin": "6.4.1",
-    "core-js": "2.5.7",
-    "css-loader": "^1.0.0",
     "dapjs": "2.3.0",
-    "es6-object-assign": "1.1.0",
-    "get-float-time-domain-data": "0.1.0",
+    "fake-indexeddb": "^6.2.5",
+    "fractch": "0.7.8",
     "get-user-media-promise": "1.1.4",
     "immutable": "3.8.2",
-    "intl": "1.2.5",
     "intl-messageformat": "^2.2.0",
-    "js-base64": "2.4.9",
+    "isomorphic-git": "^1.34.0",
+    "js-base64": "^3.7.8",
+    "jsoneditor": "10.4.2",
     "keymirror": "0.1.1",
     "lodash.bindall": "4.4.0",
     "lodash.debounce": "4.0.8",
     "lodash.defaultsdeep": "4.6.1",
-    "lodash.omit": "4.5.0",
     "lodash.throttle": "4.0.1",
+    "lucide-react": "^0.562.0",
     "omggif": "1.0.9",
     "papaparse": "5.3.0",
-    "postcss-import": "^12.0.0",
-    "postcss-loader": "^3.0.0",
-    "postcss-simple-vars": "^5.0.1",
+    "peerjs": "1.3.0",
     "prop-types": "^15.5.10",
-    "query-string": "^5.1.1",
-    "raw-loader": "^0.5.1",
     "react": "^16.0.0",
     "react-contextmenu": "2.9.4",
     "react-dom": "^16.0.0",
     "react-draggable": "3.0.5",
-    "react-ga": "2.5.3",
     "react-intl": "2.9.0",
     "react-modal": "3.9.1",
     "react-popover": "0.5.10",
     "react-redux": "5.0.7",
     "react-responsive": "5.0.0",
+    "react-router-dom": "^6.30.4",
     "react-string-replace": "^0.4.4",
     "react-style-proptype": "3.2.2",
     "react-tabs": "2.3.0",
-    "react-tooltip": "3.8.0",
+    "react-tooltip": "^5.29.1",
     "react-virtualized": "9.20.1",
     "redux": "3.7.2",
     "redux-throttle": "0.1.1",
-    "scratch-audio": "github:TurboWarp/scratch-audio#develop",
-    "scratch-blocks": "github:Nitro-Bolt/scratch-blocks#develop-builds",
-    "scratch-paint": "github:Nitro-Bolt/scratch-paint#develop",
-    "scratch-render": "github:TurboWarp/scratch-render#develop",
-    "scratch-vm": "github:Nitro-Bolt/scratch-vm#develop",
-    "style-loader": "^0.23.0",
-    "text-encoding": "0.7.0",
+    "rotur-sdk": "^2.0.0",
+    "scratch-audio": "https://codeload.github.com/MistWarp/scratch-audio/tar.gz/2f2ad72ef9c5d11bbf2ca13560489cb5d33d4c33",
+    "scratch-blocks": "https://codeload.github.com/MistWarp/scratch-blocks/tar.gz/34ab2cd34785353c25b9c16697bcba52a7c09dce",
+    "scratch-paint": "https://codeload.github.com/MistWarp/scratch-paint/tar.gz/52db8c8ede05ab2f925148ec1e783ea39b9dfca0",
+    "scratch-render": "https://codeload.github.com/MistWarp/scratch-render/tar.gz/ce8e30cb75fcba486d20a453bd51127f5a145a1a",
+    "scratch-render-fonts": "https://codeload.github.com/PenguinMod/penguinmod-render-fonts/tar.gz/4dda62c707f64505266aa62f7a6cc84f0e5812fd",
+    "scratch-vm": "https://codeload.github.com/MistWarp/scratch-vm/tar.gz/4e8113e2546ff406644f4099f99ef5a7e85aa4c5",
+    "scratchblocks": "3.7.1",
+    "sha.js": "^2.4.12",
     "to-style": "1.3.3",
     "wav-encoder": "1.3.0",
     "xhr": "2.5.0"
   },
-  "peerDependencies": {
-    "react": "^16.0.0",
-    "react-dom": "^16.0.0"
-  },
   "devDependencies": {
-    "@babel/cli": "7.14.8",
-    "@babel/core": "7.14.8",
-    "@babel/plugin-proposal-object-rest-spread": "7.14.7",
-    "@babel/plugin-syntax-dynamic-import": "7.2.0",
-    "@babel/plugin-transform-async-to-generator": "7.14.5",
-    "@babel/preset-env": "7.14.8",
-    "@babel/preset-react": "7.14.5",
-    "babel-core": "7.0.0-bridge.0",
-    "babel-eslint": "10.1.0",
-    "babel-loader": "8.3.0",
-    "chromedriver": "117.0.3",
-    "enzyme": "3.10.0",
+    "@babel/cli": "^7.28.6",
+    "@babel/core": "^7.28.6",
+    "@babel/eslint-parser": "^7.28.6",
+    "@babel/plugin-syntax-dynamic-import": "^7.8.3",
+    "@babel/plugin-transform-object-rest-spread": "^7.28.6",
+    "@babel/preset-env": "^7.28.6",
+    "@babel/preset-react": "^7.28.6",
+    "@originjs/vite-plugin-commonjs": "^1.0.3",
+    "@vitejs/plugin-react": "^4.7.0",
+    "autoprefixer": "^10.5.5",
+    "babel-jest": "^29.7.0",
+    "chromedriver": "^150.0.3",
+    "ejs": "^6.0.1",
+    "enzyme": "^3.11.0",
     "enzyme-adapter-react-16": "1.15.7",
+    "es-module-lexer": "^3.0.2",
     "eslint": "8.55.0",
     "eslint-config-scratch": "9.0.3",
-    "eslint-import-resolver-webpack": "0.11.1",
-    "eslint-plugin-import": "2.29.1",
+    "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-jest": "22.17.0",
     "eslint-plugin-react": "7.33.2",
-    "file-loader": "6.2.0",
     "gh-pages": "3.2.3",
-    "html-webpack-plugin": "^4.2.0",
-    "jest": "21.2.1",
-    "jest-junit": "7.0.0",
-    "mkdirp": "1.0.3",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "postcss": "^8.5.28",
+    "postcss-import": "^16.2.0",
+    "postcss-simple-vars": "^7.0.1",
     "raf": "3.4.1",
     "react-test-renderer": "16.14.0",
     "redux-mock-store": "1.5.3",
-    "rimraf": "2.7.1",
     "selenium-webdriver": "3.6.0",
-    "uglifyjs-webpack-plugin": "1.3.0",
-    "url-loader": "4.1.1",
+    "vite": "^6.4.3",
+    "vite-plugin-node-polyfills": "^0.28.0",
     "web-audio-test-api": "0.5.2",
-    "webpack": "4.47.0",
-    "webpack-cli": "3.3.12",
-    "webpack-dev-server": "3.11.2",
     "yauzl": "2.10.0"
   },
   "jest": {
@@ -147,18 +167,89 @@
       "raf/polyfill",
       "<rootDir>/test/helpers/enzyme-setup.js"
     ],
+    "globalSetup": "<rootDir>/test/helpers/jest-global-setup.mjs",
     "testPathIgnorePatterns": [
-      "src/test.js"
+      "src/test.js",
+      "<rootDir>/.claude/"
     ],
     "moduleNameMapper": {
+      "^scratch-paint$": "<rootDir>/test/__mocks__/scratch-paint.js",
+      "\\.module\\.css$": "<rootDir>/test/__mocks__/cssModuleMock.js",
+      "generated/editor-locales/index\\.js$": "<rootDir>/test/__mocks__/editor-locales.js",
+      "\\?arraybuffer$": "<rootDir>/test/__mocks__/arrayBufferMock.js",
+      "\\?(raw|base64|url|recolor|worker)$": "<rootDir>/test/__mocks__/fileMock.js",
+      "\\.css\\?(inline|global)$": "<rootDir>/test/__mocks__/styleMock.js",
       "\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$": "<rootDir>/test/__mocks__/fileMock.js",
       "\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js",
-      "editor-msgs(\\.js)?$": "<rootDir>/test/__mocks__/editor-msgs-mock.js"
+      "editor-msgs(\\.js)?$": "<rootDir>/test/__mocks__/editor-msgs-mock.js",
+      "^scratch-render-fonts$": "<rootDir>/src/lib/tw-scratch-render-fonts",
+      "^!arraybuffer-loader!.*$": "<rootDir>/test/__mocks__/arrayBufferMock.js",
+      "^!!base64-loader!.*$": "<rootDir>/test/__mocks__/fileMock.js",
+      "^!raw-loader!.*$": "<rootDir>/test/__mocks__/fileMock.js",
+      "^scratch-audio$": "<rootDir>/node_modules/scratch-audio/src/index.js",
+      "^scratchblocks$": "<rootDir>/node_modules/scratchblocks/build/scratchblocks.min.es.js",
+      "^fractch/browser$": "<rootDir>/node_modules/fractch/src/browser.js",
+      "^@turbowarp/scratch-svg-renderer$": "<rootDir>/node_modules/@turbowarp/scratch-svg-renderer"
+    },
+    "testEnvironment": "jsdom",
+    "testEnvironmentOptions": {
+      "customExportConditions": [
+        "node",
+        "require",
+        "default"
+      ]
+    },
+    "transformIgnorePatterns": [
+      "/node_modules/(?!(scratch-audio|scratch-paint|fractch|scratchblocks|pify|isomorphic-git|rotur-sdk|@vernier/godirect|@chenglou/pretext)/)"
+    ],
+    "transform": {
+      "^.+\\.(js|jsx|mjs|cjs)$": [
+        "babel-jest",
+        {
+          "babelrc": false,
+          "configFile": false,
+          "presets": [
+            [
+              "@babel/preset-env",
+              {
+                "targets": {
+                  "node": "current"
+                }
+              }
+            ],
+            "@babel/preset-react"
+          ],
+          "plugins": [
+            "@babel/plugin-syntax-dynamic-import",
+            "@babel/plugin-transform-object-rest-spread"
+          ]
+        }
+      ]
     }
   },
-  "overrides": {
-    "webpack@4.47.0": {
-      "terser-webpack-plugin": "^4.2.3"
-    }
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "chromedriver",
+      "fsevents",
+      "scratch-audio",
+      "scratch-blocks",
+      "scratch-vm",
+      "esbuild"
+    ],
+    "overrides": {
+      "cheerio": "1.0.0-rc.12"
+    },
+    "patchedDependencies": {
+      "@isomorphic-git/lightning-fs": "patches/@isomorphic-git__lightning-fs.patch",
+      "scratch-parser": "patches/scratch-parser.patch",
+      "@turbowarp/scratch-svg-renderer": "patches/@turbowarp__scratch-svg-renderer.patch",
+      "rotur-sdk@2.5.2": "patches/rotur-sdk@2.5.2.patch"
+    },
+    "allowUnusedPatches": true
+  },
+  "module": "./dist/scratch-gui.mjs",
+  "style": "./dist/scratch-gui.css",
+  "engines": {
+    "node": ">=20.19.0"
   }
 }
